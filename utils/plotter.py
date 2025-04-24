@@ -29,6 +29,11 @@ def plot_gantt_jobs(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm"):
     ax.set_ylabel("Jobs")
     ax.set_title(title)
     ax.grid(True)
+
+    # Stelle sicher, dass die x-Achse bei 0 beginnt
+    max_time = schedule_df['Start'] + schedule_df['Duration']
+    ax.set_xlim(left=0, right=max(max_time)*1.05)  # etwas Puffer rechts
+    
     plt.tight_layout()
     plt.show()
 
@@ -60,6 +65,11 @@ def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm 
     ax.set_ylabel("Maschinen")
     ax.set_title(title)
     ax.grid(True)
+
+    # Stelle sicher, dass die x-Achse bei 0 beginnt
+    max_time = schedule_df['Start'] + schedule_df['Duration']
+    ax.set_xlim(left=0, right=max(max_time)*1.05)  # etwas Puffer rechts
+    
     plt.tight_layout()
     plt.show()
 
