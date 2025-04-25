@@ -22,23 +22,33 @@ def check_machine_conflicts(df):
     return conflict_count == 0
 
 
-def check_job_machine_sequence(df, job_matrix):
+def check_job_machine_sequence(df: pd.DataFrame, matrix: list) -> bool:
     violations = 0
-
-    for job_id, job_ops in enumerate(job_matrix):
-        # Hole Einträge dieses Jobs aus dem DataFrame
+    for job_id, job_ops in enumerate(matrix):
         job_df = df[df["Job"] == f"Job {job_id}"].copy()
         job_df.sort_values("Start", inplace=True)
-
-        # Extrahiere tatsächliche Maschinenreihenfolge aus dem Zeitplan
         actual_sequence = job_df["Machine"].str.extract(r"M(\d+)").astype(int)[0].tolist()
         expected_sequence = [op[0] for op in job_ops]
-
         if actual_sequence != expected_sequence:
             print(f"  Reihenfolge-Verletzung bei Job {job_id}:")
             print(f"  Erwartet: {expected_sequence}")
             print(f"  Gefunden: {actual_sequence}")
             violations += 1
+    print(f"\nAnzahl verletzter Job-Maschinen-Reihenfolgen: {violations}")
+    return violations == 0
 
+
+def check_job_machine_sequence_dict(df: pd.DataFrame, job_dict: dict) -> bool:
+    violations = 0
+    for job_name, job_ops in job_dict.items():
+        job_df = df[df["Job"] == job_name].copy()
+        job_df.sort_values("Start", inplace=True)
+        actual_sequence = job_df["Machine"].str.extract(r"M(\d+)").astype(int)[0].tolist()
+        expected_sequence = [op[0] for op in job_ops]
+        if actual_sequence != expected_sequence:
+            print(f"  Reihenfolge-Verletzung bei {job_name}:")
+            print(f"  Erwartet: {expected_sequence}")
+            print(f"  Gefunden: {actual_sequence}")
+            violations += 1
     print(f"\nAnzahl verletzter Job-Maschinen-Reihenfolgen: {violations}")
     return violations == 0
