@@ -1,25 +1,27 @@
 import pandas as pd
 
-def check_machine_conflicts(df):
-    # Sortiere DataFrame nach Machine und Startzeit
-    df_sorted = df.sort_values(by=["Machine", "Start"]).reset_index(drop=True)
+def check_machine_conflicts(df_schedule: pd.DataFrame) -> pd.DataFrame | None:
+    df = df_schedule.sort_values(["Machine", "Start"])  
+    conflict_indices = []
 
-    conflict_count = 0
+    for machine in df["Machine"].unique():
+        machine_df = df[df["Machine"] == machine].sort_values("Start")
 
-    # Überprüfe jede Maschine einzeln
-    for machine in df_sorted["Machine"].unique():
-        machine_df = df_sorted[df_sorted["Machine"] == machine].sort_values(by="Start")
-
-        # Zeilenweise durchgehen und Startzeiten vergleichen
         for i in range(1, len(machine_df)):
-            prev_end = machine_df.iloc[i - 1]["End"]
-            curr_start = machine_df.iloc[i]["Start"]
+            prev = machine_df.iloc[i - 1]
+            curr = machine_df.iloc[i]
 
-            if curr_start < prev_end:
-                conflict_count += 1
+            if curr["Start"] < prev["End"]:
+                conflict_indices.extend([prev.name, curr.name])
 
-    print(f"Gefundene Konflikte auf Maschinen: {conflict_count}")
-    return conflict_count == 0
+    conflict_indices = sorted(set(conflict_indices))
+
+    if conflict_indices:
+        print(f"Maschinenkonflikte gefunden: {len(conflict_indices)} Zeilen betroffen.")
+        return df_schedule.loc[conflict_indices].sort_values(["Machine", "Start"])
+    else:
+        print("Keine Maschinenkonflikte gefunden.")
+        return None
 
 
 def check_job_machine_sequence(df: pd.DataFrame, matrix: list) -> bool:
@@ -52,3 +54,22 @@ def check_job_machine_sequence_dict(df: pd.DataFrame, job_dict: dict) -> bool:
             violations += 1
     print(f"\nAnzahl verletzter Job-Maschinen-Reihenfolgen: {violations}")
     return violations == 0
+
+
+def check_correct_start(df_schedule, df_arrivals):
+    # Arrival-Dictionary bauen
+    arrival_dict = dict(zip(df_arrivals["Job-ID"], df_arrivals["Ankunftszeit (Minuten)"]))
+
+    # Ankunftszeit mappen
+    df = df_schedule.copy()
+    df["Ankunftszeit"] = df["Job"].map(arrival_dict)
+
+    # Regelverletzungen: Start < Ankunft
+    violations = df[df["Start"] < df["Ankunftszeit"]]
+
+    if violations.empty:
+        print("\nAlle Starts erfolgen nach der Ankunftszeit.")
+        return None
+    else:
+        print("\nFehlerhafte Starts gefunden:")
+        return violations
