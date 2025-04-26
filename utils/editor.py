@@ -48,6 +48,16 @@ def merge_jssp_jobs(new_jobs: dict, remained_jobs: dict) -> dict:
     return merged 
 
 
+def merge_jobs(jobs_a, jobs_b):
+    """
+    Kombiniert zwei Job-Dictionaries.
+    Falls eines None ist, wird das andere übernommen.
+    """
+    jobs_a = jobs_a or {}
+    jobs_b = jobs_b or {}
+    return {**jobs_a, **jobs_b}
+
+
 def add_remaining_jobs_with_zero_arrival(df_arrivals_new: pd.DataFrame, remaining_jobs: dict, day_id: int) -> pd.DataFrame:
     job_names = list(remaining_jobs.keys())
 
