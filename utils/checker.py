@@ -176,9 +176,9 @@ def check_all_constraints(df_schedule: pd.DataFrame, job_dict: dict, df_arrivals
         checks_passed = False
 
     if checks_passed:
-        print("✅ Alle Constraints wurden erfüllt.\n")
+        print("\t✅ Alle Constraints wurden erfüllt.\n")
     else:
-        print("❗ Es wurden Constraint-Verletzungen gefunden.\n")
+        print("\t❗ Es wurden Constraint-Verletzungen gefunden.\n")
 
     return checks_passed
 
