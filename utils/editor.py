@@ -6,14 +6,14 @@ def get_operations_ending_after_day_limit(df: pd.DataFrame, daily_timelimit_h: f
     daily_timelimit = daily_timelimit_h * 60  # Umrechnung in Minuten
     return df[df["End"] > daily_timelimit].copy()
 
-def separate_operation_by_day_limit(df_schedule: pd.DataFrame, day_limit_h: float = 21):
+def separate_operation_by_day_limit(df_schedule: pd.DataFrame, day_limit_h: int = 24):
     """
     Trennt einen Operationsplan in:
     - df_schedule_on_time: Operationen, die innerhalb des Tageslimits enden
     - df_late: Operationen, die nach dem Tageslimit enden
 
     :param df_schedule: DataFrame mit Spalte "End" (Endzeit in Minuten)
-    :param day_limit_h: Tageszeitlimit in Stunden (Standard: 21h)
+    :param day_limit_h: Tageszeitlimit in Stunden (Standard: 24h)
     :return: df_schedule_on_time, df_late
     """
     day_limit_minutes = day_limit_h * 60  # Umrechnung Stunden → Minuten
@@ -47,7 +47,7 @@ def merge_jssp_jobs(new_jobs: dict, remained_jobs: dict) -> dict:
     return merged 
 
 
-def merge_jobs(jobs_a, jobs_b):
+def merge_jobs(jobs_a: dict, jobs_b: dict)-> dict:
     """
     Kombiniert zwei Job-Dictionaries.
     Falls eines None ist, wird das andere übernommen.
