@@ -240,4 +240,91 @@ def solve_stage2_early_starts(job_dict, df_arrivals, optimal_makespan, day_id=0,
 
 
 
+# v2
+def solve_stage2_early_starts_all(job_dict, df_arrivals, optimal_makespan, day_id=0, solver_time_limit=300, epsilon=0.06):
+    """
+    Zweite Stufe: Minimierung der Summe aller Startzeiten unter Fixierung des Makespan (verbesserte Version).
+
+    Parameter:
+    - job_dict: Dictionary der Jobs mit Maschinen- und Bearbeitungszeiten.
+    - df_arrivals: DataFrame mit Ankunftszeiten der Jobs.
+    - optimal_makespan: Optimales Makespan aus Stufe 1 (fester Endzeitpunkt).
+    - day_id: Tag-Identifikator für Mehrtagesplanung.
+    - solver_time_limit: Zeitlimit für den Solver (Sekunden).
+    - epsilon: Kleiner Sicherheitsabstand zwischen Operationen auf derselben Maschine.
+    """
+
+    job_names = list(job_dict.keys())
+    num_jobs = len(job_names)
+    all_ops = list(job_dict.values())
+    all_machines = {op[0] for job in all_ops for op in job}
+
+    prob = pulp.LpProblem("JobShop_Secondary_EarlyStart", pulp.LpMinimize)
+
+    # Startzeit-Variablen
+    starts = {
+        (j, o): pulp.LpVariable(f"start_{j}_{o}", lowBound=0, cat="Continuous")
+        for j in range(num_jobs) for o in range(len(all_ops[j]))
+    }
+
+    # Ankunftszeiten vorbereiten
+    arrival_times = df_arrivals.set_index("Job-ID")["Ankunftszeit (Minuten)"].to_dict()
+
+    # Technologische Reihenfolge und Ankunftszeiten einfügen
+    for j, job_name in enumerate(job_names):
+        job = job_dict[job_name]
+        prob += starts[(j, 0)] >= arrival_times[job_name]
+        for o in range(1, len(job)):
+            d_prev = job[o - 1][1]
+            prob += starts[(j, o)] >= starts[(j, o - 1)] + d_prev
+
+    # Maschinenkonflikte (mit epsilon Abstand)
+    bigM = 1e5
+    for m in all_machines:
+        ops = [(j, o, d) for j in range(num_jobs)
+               for o, (mach, d) in enumerate(all_ops[j]) if mach == m]
+        for i in range(len(ops)):
+            j1, o1, d1 = ops[i]
+            for j2, o2, d2 in ops[i + 1:]:
+                if j1 != j2:
+                    y = pulp.LpVariable(f"y_{j1}_{o1}_{j2}_{o2}", cat="Binary")
+                    prob += starts[(j1, o1)] + d1 + epsilon <= starts[(j2, o2)] + bigM * (1 - y)
+                    prob += starts[(j2, o2)] + d2 + epsilon <= starts[(j1, o1)] + bigM * y
+
+    # Fixierter Makespan: Endzeit der letzten Operationen darf den optimalen Makespan nicht überschreiten
+    for j in range(num_jobs):
+        last_op = len(all_ops[j]) - 1
+        prob += starts[(j, last_op)] + all_ops[j][last_op][1] <= optimal_makespan
+
+    # ZIEL: Minimierung der Summe aller Startzeiten (nicht nur der ersten Operationen)
+    total_start = pulp.lpSum([starts[(j, o)] for j in range(num_jobs) for o in range(len(all_ops[j]))])
+    prob += total_start
+
+    # Solver starten
+    solver = pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit)
+    prob.solve(solver)
+
+    # Ergebnisse extrahieren
+    schedule_data = []
+    for (j, o), var in sorted(starts.items()):
+        start = var.varValue
+        if start is not None:
+            machine, duration = all_ops[j][o]
+            end = start + duration
+            schedule_data.append({
+                "Job": job_names[j],
+                "Machine": f"M{machine}",
+                "Day-ID": day_id,
+                "Start": round(start, 2),
+                "Duration": duration,
+                "End": round(end, 2)
+            })
+
+    df_schedule = pd.DataFrame(schedule_data)
+    return df_schedule, optimal_makespan
+
+
+
+
+
 
