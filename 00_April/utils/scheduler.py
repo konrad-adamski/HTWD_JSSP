@@ -39,7 +39,7 @@ def get_interarrival_time_from_dict(job_dict, u_b_mmax=0.9):
 
 # Ankunftszeiten ---------------------------------------------------------------------
 
-def generate_job_arrivals(job_dict, u_b_mmax=0.9, day_id=0, random_seed_jobs=12, random_seed_times=123):
+def generate_job_arrivals_df(job_dict, u_b_mmax=0.9, day_id=0, random_seed_jobs=12, random_seed_times=123):
     job_names = list(job_dict.keys())  # z. B. ['job 00_0', ..., 'job 00_9']
     n_jobs = len(job_names)
 
