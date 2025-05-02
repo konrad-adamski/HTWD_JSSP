@@ -56,7 +56,7 @@ def is_job_machine_sequence_correct(df: pd.DataFrame, job_dict: dict) -> bool:
     return False
 
 
-def is_start_correct_(df_schedule: pd.DataFrame, df_arrivals: pd.DataFrame) -> bool:
+def is_start_correct(df_schedule: pd.DataFrame, df_arrivals: pd.DataFrame) -> bool:
     """
     Prüft, ob alle Jobs frühestens ab ihrer Ankunftszeit starten.
     Gibt True zurück, wenn alle Starts korrekt sind.
@@ -98,7 +98,7 @@ def check_all_constraints(df_schedule: pd.DataFrame, job_dict: dict, df_arrivals
     if not is_job_machine_sequence_correct(df_schedule, job_dict):
         checks_passed = False
 
-    if not is_start_correct_(df_schedule, df_arrivals):
+    if not is_start_correct(df_schedule, df_arrivals):
         checks_passed = False
 
     if checks_passed:

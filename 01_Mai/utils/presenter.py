@@ -8,7 +8,7 @@ def print_jobs(job_dict: dict):
     print("")
     
 # GANTT Charts ---------------------------------------------------------------------------
-def plot_gantt_jobs(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm"):
+def plot_gantt_jobs(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm", duration_column: str = "Duration"):
     machines = sorted(schedule_df['Machine'].unique())
     
     # Bessere Farbskala: nipy_spectral für mehr Kontrast
@@ -23,7 +23,7 @@ def plot_gantt_jobs(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm"):
         job_ops = schedule_df[schedule_df['Job'] == job]
         for _, row in job_ops.iterrows():
             color = color_map[row['Machine']]
-            ax.barh(idx, row['Duration'], left=row['Start'], height=0.5, color=color, edgecolor='black')
+            ax.barh(idx, row[duration_column], left=row['Start'], height=0.5, color=color, edgecolor='black')
 
     # Legende
     legend_handles = [mpatches.Patch(color=color_map[m], label=f"{m}") for m in machines]
@@ -36,14 +36,14 @@ def plot_gantt_jobs(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm"):
     ax.set_title(title)
     ax.grid(True)
 
-    max_time = schedule_df['Start'] + schedule_df['Duration']
+    max_time = schedule_df['Start'] + schedule_df[duration_column]
     ax.set_xlim(left=0, right=max(max_time) * 1.05)
     plt.tight_layout()
     plt.show()
 
 
 
-def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm (Maschinenansicht)"):
+def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm (Maschinenansicht)", duration_column: str = "Duration"):
     jobs = sorted(schedule_df['Job'].unique())
 
     # Farbskala mit hoher Unterscheidbarkeit (gleich wie bei plot_gantt_jobs)
@@ -58,7 +58,7 @@ def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm 
         ops = schedule_df[schedule_df['Machine'] == machine]
         for _, row in ops.iterrows():
             color = color_map[row['Job']]
-            ax.barh(idx, row['Duration'], left=row['Start'], height=0.5, color=color, edgecolor='black')
+            ax.barh(idx, row[duration_column], left=row['Start'], height=0.5, color=color, edgecolor='black')
 
     # Legende (Jobs)
     legend_handles = [mpatches.Patch(color=color_map[job], label=job) for job in jobs]
@@ -71,7 +71,7 @@ def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm 
     ax.set_title(title)
     ax.grid(True)
 
-    max_time = schedule_df['Start'] + schedule_df['Duration']
+    max_time = schedule_df['Start'] + schedule_df[duration_column]
     ax.set_xlim(left=0, right=max(max_time) * 1.05)
     plt.tight_layout()
     plt.show()
