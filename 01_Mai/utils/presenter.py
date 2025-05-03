@@ -45,14 +45,16 @@ def plot_gantt_jobs(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm", du
 
 def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm (Maschinenansicht)", duration_column: str = "Duration"):
     jobs = sorted(schedule_df['Job'].unique())
+    machines = sorted(schedule_df['Machine'].unique())
+    yticks = range(len(machines))
 
-    # Farbskala mit hoher Unterscheidbarkeit (gleich wie bei plot_gantt_jobs)
+    # Farbskala mit hoher Unterscheidbarkeit
     cmap = plt.cm.get_cmap("nipy_spectral", len(jobs))
     color_map = {job: cmap(i) for i, job in enumerate(jobs)}
 
-    fig, ax = plt.subplots(figsize=(14, 8))
-    machines = sorted(schedule_df['Machine'].unique())
-    yticks = range(len(machines))
+    # Dynamische Höhe: 1 Inch pro Maschine
+    fig_height = len(machines) * 0.8
+    fig, ax = plt.subplots(figsize=(16, fig_height))
 
     for idx, machine in enumerate(machines):
         ops = schedule_df[schedule_df['Machine'] == machine]
@@ -62,17 +64,24 @@ def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm 
 
     # Legende (Jobs)
     legend_handles = [mpatches.Patch(color=color_map[job], label=job) for job in jobs]
-    ax.legend(handles=legend_handles, title="Jobs", bbox_to_anchor=(1.05, 1), loc='upper left')
+
+    legend_column_numb = (len(jobs) // 35) + 1
+    ax.legend(handles=legend_handles, title="Jobs", bbox_to_anchor=(1.05, 1), loc='upper left', ncol=legend_column_numb)
 
     ax.set_yticks(yticks)
     ax.set_yticklabels(machines)
-    ax.set_xlabel("Zeit")
+    ax.set_xlabel("Minuten")
     ax.set_ylabel("Maschinen")
     ax.set_title(title)
-    ax.grid(True)
+    ax.grid(True, axis='y', linestyle='--', alpha=0.6)
 
     max_time = schedule_df['Start'] + schedule_df[duration_column]
     ax.set_xlim(left=0, right=max(max_time) * 1.05)
+
+    # Vertikale Linien alle 1440 Zeiteinheiten (z. B. 1 Tag bei Minuten)
+    for x in range(0, int(max(max_time)) + 1440, 1440):
+        ax.axvline(x=x, color='gray', linestyle=':', linewidth=0.8, alpha=0.6)
+        
     plt.tight_layout()
     plt.show()
 
