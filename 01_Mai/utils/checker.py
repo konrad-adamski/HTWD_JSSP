@@ -10,7 +10,7 @@ def is_machine_conflict_free(df_schedule: pd.DataFrame) -> bool:
     Gibt True zurück, wenn konfliktfrei.
     Gibt False zurück und druckt die Konflikte, wenn Konflikte existieren.
     """
-    df = df_schedule.sort_values(["Machine", "Start"])
+    df = df_schedule.sort_values(["Machine", "Start"]).reset_index(drop=True)
     conflict_indices = []
 
     for machine in df["Machine"].unique():
@@ -56,21 +56,14 @@ def is_job_machine_sequence_correct(df: pd.DataFrame, job_dict: dict) -> bool:
     return False
 
 
-def is_start_correct(df_schedule: pd.DataFrame, df_arrivals: pd.DataFrame) -> bool:
-    """
-    Prüft, ob alle Jobs frühestens ab ihrer Ankunftszeit starten.
-    Gibt True zurück, wenn alle Starts korrekt sind.
-    Gibt False zurück und zeigt fehlerhafte Starts, wenn vorhanden.
-    """
-    # Arrival-Dictionary bauen
-    arrival_dict = dict(zip(df_arrivals["Job-ID"], df_arrivals["Ankunftszeit (Minuten)"]))
 
-    # Ankunftszeit mappen
-    df = df_schedule.copy()
-    df["Ankunftszeit"] = df["Job"].map(arrival_dict)
 
-    # Regelverletzungen: Start < Ankunft
-    violations = df[df["Start"] < df["Ankunftszeit"]]
+def is_start_correct(df_schedule: pd.DataFrame) -> bool:
+    """
+    Prüft, ob alle Operationen frühestens ab ihrer Ankunftszeit starten.
+    Erwartet, dass 'Arrival' bereits in df_schedule vorhanden ist.
+    """
+    violations = df_schedule[df_schedule["Start"] < df_schedule["Arrival"]]
 
     if violations.empty:
         return True
@@ -81,7 +74,8 @@ def is_start_correct(df_schedule: pd.DataFrame, df_arrivals: pd.DataFrame) -> bo
 
 
 
-def check_all_constraints(df_schedule: pd.DataFrame, job_dict: dict, df_arrivals: pd.DataFrame) -> bool:
+
+def check_all_constraints(df_schedule: pd.DataFrame, job_dict: dict) -> bool:
     """
     Führt alle wichtigen Prüfungen auf einem Tages-Schedule durch:
     - Maschinenkonflikte
@@ -98,7 +92,7 @@ def check_all_constraints(df_schedule: pd.DataFrame, job_dict: dict, df_arrivals
     if not is_job_machine_sequence_correct(df_schedule, job_dict):
         checks_passed = False
 
-    if not is_start_correct(df_schedule, df_arrivals):
+    if not is_start_correct(df_schedule):
         checks_passed = False
 
     if checks_passed:

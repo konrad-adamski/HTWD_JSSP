@@ -213,6 +213,119 @@ def solve_jssp_weighted_individual_flowtime(job_dict, df_arrivals, solver_time_l
     return df_schedule, total_weighted_flowtime
 
 
+def solve_jssp_weighted_individual_flowtime_v2(job_dict, df_arrivals, solver_time_limit=300, epsilon=0.00, arrival_column="Ankunftszeit (Minuten)"):
+    """
+    Minimiert die gewichtete Summe der individuellen Durchlaufzeiten (Flow Times) aller Jobs.
+    Gewichtung bevorzugt früh ankommende Jobs.
+
+    Gewicht_j = 1 / (1 + Ankunftszeit_j)
+    Zielfunktion: sum_j [ Gewicht_j * (Endzeit_j - Ankunftszeit_j) ]
+
+    Parameter:
+    - job_dict: Dictionary mit Jobdaten (jede Operation als (Maschine, Dauer))
+    - df_arrivals: DataFrame mit Spalten "Job-ID" und Ankunftszeit
+    - arrival_column: Name der Spalte mit den Ankunftszeiten
+    - solver_time_limit: Max. Zeit in Sekunden für den Solver
+    - epsilon: Kleiner Abstand zur Vermeidung von Maschinenkonflikten
+    """
+
+    # Ankunftszeiten als Dictionary
+    df_arrivals = df_arrivals.sort_values(arrival_column).reset_index(drop=True)
+    arrival_times = df_arrivals.set_index("Job")[arrival_column].to_dict()
+
+    # Jobnamen nach Ankunftszeit sortieren (absteigend)
+    job_names = list(df_arrivals.sort_values(arrival_column, ascending=False)["Job"])
+
+    num_jobs = len(job_names)
+
+    # Operationen in Ankunftsreihenfolge
+    all_ops = [job_dict[job] for job in job_names]
+
+    # Maschinen extrahieren
+    all_machines = {op[0] for job in all_ops for op in job}
+
+    # LP-Problem
+    prob = pulp.LpProblem("JobShop_Weighted_Total_FlowTime", pulp.LpMinimize)
+
+    # Startzeitvariablen
+    starts = {
+        (j, o): pulp.LpVariable(f"start_{j}_{o}", lowBound=0, cat="Continuous")
+        for j in range(num_jobs) for o in range(len(all_ops[j]))
+    }
+
+    # Endzeitvariablen je Job
+    job_ends = {
+        j: pulp.LpVariable(f"job_end_{j}", lowBound=0, cat="Continuous")
+        for j in range(num_jobs)
+    }
+
+    # Gewichtung: frühere Ankunft = höhere Priorität
+    weights = {j: 1 / (1 + arrival_times[job_names[j]]) for j in range(num_jobs)}
+
+    # Zielfunktion: gewichtete Durchlaufzeiten minimieren
+    prob += pulp.lpSum([
+        weights[j] * (job_ends[j] - arrival_times[job_names[j]])
+        for j in range(num_jobs)
+    ])
+
+    # Technologische Reihenfolge + Ankunft
+    for j, job_name in enumerate(job_names):
+        job = job_dict[job_name]
+        prob += starts[(j, 0)] >= arrival_times[job_name]
+        for o in range(1, len(job)):
+            d_prev = job[o - 1][1]
+            prob += starts[(j, o)] >= starts[(j, o - 1)] + d_prev
+
+    # Maschinenkonflikte
+    bigM = 1e5
+    for m in all_machines:
+        ops = [(j, o, d) for j in range(num_jobs)
+               for o, (mach, d) in enumerate(all_ops[j]) if mach == m]
+        for i in range(len(ops)):
+            j1, o1, d1 = ops[i]
+            for j2, o2, d2 in ops[i + 1:]:
+                if j1 != j2:
+                    y = pulp.LpVariable(f"y_{j1}_{o1}_{j2}_{o2}", cat="Binary")
+                    prob += starts[(j1, o1)] + d1 + epsilon <= starts[(j2, o2)] + bigM * (1 - y)
+                    prob += starts[(j2, o2)] + d2 + epsilon <= starts[(j1, o1)] + bigM * y
+
+    # Endzeit je Job = Ende letzter Operation
+    for j in range(num_jobs):
+        last_op = len(all_ops[j]) - 1
+        prob += job_ends[j] >= starts[(j, last_op)] + all_ops[j][last_op][1]
+
+    # Solver
+    solver = pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit)
+    prob.solve(solver)
+
+    # Ergebnisse extrahieren
+    schedule_data = []
+    for (j, o), var in sorted(starts.items()):
+        start = var.varValue
+        if start is not None:
+            machine, duration = all_ops[j][o]
+            end = start + duration
+            schedule_data.append({
+                "Job": job_names[j],
+                "Machine": f"M{machine}",
+                "Start": round(start, 2),
+                "Processing Time": duration,
+                "End": round(end, 2)
+            })
+
+    df_schedule = pd.DataFrame(schedule_data)
+
+    df_schedule["Arrival"] = df_schedule["Job"].map(arrival_times)
+    df_schedule["Flow time"] = df_schedule["End"] - df_schedule["Arrival"]
+
+    df_schedule = df_schedule[["Job", "Arrival", "Machine", "Start", "Processing Time", "Flow time", "End"]]
+
+    # Gesamtzielwert
+    total_weighted_flowtime = round(pulp.value(prob.objective), 3)
+
+    return df_schedule, total_weighted_flowtime
+
+
 ## Two Stages --------------------------------------------------------------------------------------------------------------
 # --------------------------------------------------------------------------------------------------------------------------
 
