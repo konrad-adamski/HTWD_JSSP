@@ -30,6 +30,7 @@ def is_machine_conflict_free(df_schedule: pd.DataFrame) -> bool:
         print(df_schedule.loc[conflict_indices].sort_values(["Machine", "Start"]))
         return False
     else:
+        print("✅ Keine Maschinenkonflikte gefunden")
         return True
 
 def is_job_machine_sequence_correct(df: pd.DataFrame, job_dict: dict) -> bool:
@@ -48,6 +49,7 @@ def is_job_machine_sequence_correct(df: pd.DataFrame, job_dict: dict) -> bool:
             violations.append((job, expected, actual))
 
     if not violations:
+        print("✅ Job-Machinen-Reihenfolge (Reihenfolge der Operationen je Job) ist korrekt!")
         return True
 
     print(f"Reihenfolge-Verletzungen bei {len(violations)} Jobs:")
@@ -66,6 +68,7 @@ def is_start_correct(df_schedule: pd.DataFrame) -> bool:
     violations = df_schedule[df_schedule["Start"] < df_schedule["Arrival"]]
 
     if violations.empty:
+        print("✅ Alle Operation starten erst nach Arrival des Job")
         return True
     else:
         print(f"Fehlerhafte Starts gefunden ({len(violations)} Zeilen):")
@@ -73,6 +76,35 @@ def is_start_correct(df_schedule: pd.DataFrame) -> bool:
         return False
 
 
+def is_job_timing_correct(df_schedule: pd.DataFrame) -> bool:
+    """
+    Prüft nur die zeitliche technologische Reihenfolge pro Job:
+    Jede Operation muss frühestens nach Ende der vorherigen starten.
+    Gibt True zurück, wenn alles korrekt ist.
+    Gibt False zurück und zeigt fehlerhafte Zeitabfolgen.
+    """
+    df = df_schedule.copy()
+    df = df.sort_values(["Job", "Start"]).reset_index(drop=True)
+
+    violations = []
+
+    for job in df["Job"].unique():
+        df_job = df[df["Job"] == job].sort_values("Start").reset_index(drop=True)
+
+        for i in range(1, len(df_job)):
+            prev_end = df_job.loc[i - 1, "End"]
+            curr_start = df_job.loc[i, "Start"]
+            if curr_start < prev_end:
+                violations.append((job, i, round(prev_end, 2), round(curr_start, 2)))
+
+    if not violations:
+        print("✅ Zeitliche technologische Reihenfolge korrekt.")
+        return True
+    else:
+        print(f"❌ {len(violations)} Zeitverletzungen gefunden:")
+        for job, i, prev_end, curr_start in violations:
+            print(f"  ⏱️  Job {job} – Operation {i} startet zu früh: {curr_start} < {prev_end}")
+        return False
 
 
 def check_all_constraints(df_schedule: pd.DataFrame, job_dict: dict) -> bool:
@@ -95,10 +127,13 @@ def check_all_constraints(df_schedule: pd.DataFrame, job_dict: dict) -> bool:
     if not is_start_correct(df_schedule):
         checks_passed = False
 
+    if not is_job_timing_correct(df_schedule):
+        checks_passed = False
+
     if checks_passed:
-        print("\t✅ Alle Constraints wurden erfüllt.\n")
+        print("\n✅ Alle Constraints wurden erfüllt.\n")
     else:
-        print("\t❗ Es wurden Constraint-Verletzungen gefunden.\n")
+        print("\n❗ Es wurden Constraint-Verletzungen gefunden.\n")
 
     return checks_passed
 
