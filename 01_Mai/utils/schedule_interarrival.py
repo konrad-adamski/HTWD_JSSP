@@ -15,37 +15,14 @@ def generate_job_arrivals_df_by_mean_interarrival_time(job_dict, t_a= 70, random
     arrival_times = np.round(np.cumsum(interarrival_times), 2)
 
     df_arrivals = pd.DataFrame({
-        "Job-ID": job_names,
-        "Ankunftszeit (Minuten)": arrival_times
+        "Job": job_names,
+        "Arrival": arrival_times
     })
 
     return df_arrivals
 
-def generate_job_arrivals_df(job_dict, u_b_mmax=0.9, random_seed_jobs=12, random_seed_times=122):
-    job_names = list(job_dict.keys())
-    n_jobs = len(job_names)
 
-    # Permutiere Jobnamen
-    np.random.seed(random_seed_jobs)
-    shuffled_jobs = list(np.random.permutation(job_names))
-
-    # Interarrival-Zeit auf Basis der Engpassmaschine
-    t_a = calculate_mean_interarrival_time(job_dict, u_b_mmax=u_b_mmax)
-
-    # Erzeuge Ankunftszeiten
-    np.random.seed(random_seed_times)
-    interarrival_times = np.random.exponential(scale=t_a, size=n_jobs)
-    interarrival_times[0] = 0.0  # Start bei 0 Minuten
-    arrival_times = np.round(np.cumsum(interarrival_times), 2)
-
-    df_day = pd.DataFrame({
-        "Job-ID": shuffled_jobs,
-        "Ankunftszeit (Minuten)": arrival_times
-    })
-
-    return df_day
-    
-# Berechnung der mittleren Zwischenankunftszeit für geg. Job-Matrix -----------------------------------------
+# Berechnung der mittleren Zwischenankunftszeit für geg. Job-Matrix ---------------------------------------------------------
 def calculate_mean_interarrival_time(jobs: dict, u_b_mmax: float = 0.9) ->float:
     """
     Berechnet die mittlere Interarrival-Zeit t_a, sodass die Engpassmaschine

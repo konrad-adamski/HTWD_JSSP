@@ -1,8 +1,13 @@
 import pulp
 import pandas as pd
+from collections import defaultdict
+from typing import Dict, List, Tuple
 # conda install -c conda-forge highs
 
-#  ungewichtet
+# Exact MILP Formulation ------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
+
+# MILP with HiGHS - minimizing all FlowTimes -----------------------------------------------------------------------
 def solve_jssp_individual_flowtime(job_dict, df_arrivals, solver_time_limit=300, epsilon=0.00):
     """
     Minimiert die Summe der individuellen Durchlaufzeiten (Flow Times) aller Jobs.
@@ -10,17 +15,17 @@ def solve_jssp_individual_flowtime(job_dict, df_arrivals, solver_time_limit=300,
 
     Parameter:
     - job_dict: Dictionary mit Jobdaten (jede Operation als (Maschine, Dauer))
-    - df_arrivals: DataFrame mit Spalten "Job-ID" und "Ankunftszeit (Minuten)"
+    - df_arrivals: DataFrame mit Spalten "Job" und "Arrival"
     - solver_time_limit: Max. Zeit in Sekunden für den Solver
     - epsilon: Kleiner Abstand zur Vermeidung von Maschinenkonflikten
     """
 
     # Ankunftszeiten als Dictionary
-    df_arrivals = df_arrivals.sort_values("Ankunftszeit (Minuten)").reset_index(drop=True)
-    arrival_times = df_arrivals.set_index("Job-ID")["Ankunftszeit (Minuten)"].to_dict()
+    df_arrivals = df_arrivals.sort_values("Arrival").reset_index(drop=True)
+    arrival_times = df_arrivals.set_index("Job")["Arrival"].to_dict()
 
     # Jobnamen nach Ankunftszeit sortieren (absteigend)
-    job_names = list(df_arrivals.sort_values("Ankunftszeit (Minuten)", ascending=False)["Job-ID"])
+    job_names = list(df_arrivals.sort_values("Arrival", ascending=False)["Job"])
 
     num_jobs = len(job_names)
     all_ops = [job_dict[job] for job in job_names]
@@ -100,7 +105,9 @@ def solve_jssp_individual_flowtime(job_dict, df_arrivals, solver_time_limit=300,
     total_flowtime = round(pulp.value(prob.objective), 3)
     return df_schedule, total_flowtime
 
-# gewichtet
+
+
+# MILP with HiGHS - minimizing all FlowTimes (weightend) ------------------------------------------------------------
 def solve_jssp_weighted_individual_flowtime(job_dict, df_arrivals, solver_time_limit=300, epsilon=0.00):
     """
     Minimiert die gewichtete Summe der individuellen Durchlaufzeiten (Flow Times) aller Jobs.
@@ -111,17 +118,17 @@ def solve_jssp_weighted_individual_flowtime(job_dict, df_arrivals, solver_time_l
 
     Parameter:
     - job_dict: Dictionary mit Jobdaten (jede Operation als (Maschine, Dauer))
-    - df_arrivals: DataFrame mit Spalten "Job-ID" und "Ankunftszeit (Minuten)"
+    - df_arrivals: DataFrame mit Spalten "Job" und "Arrival"
     - solver_time_limit: Max. Zeit in Sekunden für den Solver
     - epsilon: Kleiner Abstand zur Vermeidung von Maschinenkonflikten
     """
 
     # Ankunftszeiten als Dictionary
-    df_arrivals = df_arrivals.sort_values("Ankunftszeit (Minuten)").reset_index(drop=True)
-    arrival_times = df_arrivals.set_index("Job-ID")["Ankunftszeit (Minuten)"].to_dict()
+    df_arrivals = df_arrivals.sort_values("Arrival").reset_index(drop=True)
+    arrival_times = df_arrivals.set_index("Job")["Arrival"].to_dict()
 
     # Jobnamen nach Ankunftszeit sortieren (absteigend)
-    job_names = list(df_arrivals.sort_values("Ankunftszeit (Minuten)", ascending=False)["Job-ID"])
+    job_names = list(df_arrivals.sort_values("Arrival", ascending=False)["Job"])
 
     num_jobs = len(job_names)
 
@@ -213,124 +220,9 @@ def solve_jssp_weighted_individual_flowtime(job_dict, df_arrivals, solver_time_l
     return df_schedule, total_weighted_flowtime
 
 
-def solve_jssp_weighted_individual_flowtime_v2(job_dict, df_arrivals, solver_time_limit=300, epsilon=0.00, arrival_column="Ankunftszeit (Minuten)"):
-    """
-    Minimiert die gewichtete Summe der individuellen Durchlaufzeiten (Flow Times) aller Jobs.
-    Gewichtung bevorzugt früh ankommende Jobs.
 
-    Gewicht_j = 1 / (1 + Ankunftszeit_j)
-    Zielfunktion: sum_j [ Gewicht_j * (Endzeit_j - Ankunftszeit_j) ]
-
-    Parameter:
-    - job_dict: Dictionary mit Jobdaten (jede Operation als (Maschine, Dauer))
-    - df_arrivals: DataFrame mit Spalten "Job-ID" und Ankunftszeit
-    - arrival_column: Name der Spalte mit den Ankunftszeiten
-    - solver_time_limit: Max. Zeit in Sekunden für den Solver
-    - epsilon: Kleiner Abstand zur Vermeidung von Maschinenkonflikten
-    """
-
-    # Ankunftszeiten als Dictionary
-    df_arrivals = df_arrivals.sort_values(arrival_column).reset_index(drop=True)
-    arrival_times = df_arrivals.set_index("Job")[arrival_column].to_dict()
-
-    # Jobnamen nach Ankunftszeit sortieren (absteigend)
-    job_names = list(df_arrivals.sort_values(arrival_column, ascending=False)["Job"])
-
-    num_jobs = len(job_names)
-
-    # Operationen in Ankunftsreihenfolge
-    all_ops = [job_dict[job] for job in job_names]
-
-    # Maschinen extrahieren
-    all_machines = {op[0] for job in all_ops for op in job}
-
-    # LP-Problem
-    prob = pulp.LpProblem("JobShop_Weighted_Total_FlowTime", pulp.LpMinimize)
-
-    # Startzeitvariablen
-    starts = {
-        (j, o): pulp.LpVariable(f"start_{j}_{o}", lowBound=0, cat="Continuous")
-        for j in range(num_jobs) for o in range(len(all_ops[j]))
-    }
-
-    # Endzeitvariablen je Job
-    job_ends = {
-        j: pulp.LpVariable(f"job_end_{j}", lowBound=0, cat="Continuous")
-        for j in range(num_jobs)
-    }
-
-    # Gewichtung: frühere Ankunft = höhere Priorität
-    weights = {j: 1 / (1 + arrival_times[job_names[j]]) for j in range(num_jobs)}
-
-    # Zielfunktion: gewichtete Durchlaufzeiten minimieren
-    prob += pulp.lpSum([
-        weights[j] * (job_ends[j] - arrival_times[job_names[j]])
-        for j in range(num_jobs)
-    ])
-
-    # Technologische Reihenfolge + Ankunft
-    for j, job_name in enumerate(job_names):
-        job = job_dict[job_name]
-        prob += starts[(j, 0)] >= arrival_times[job_name]
-        for o in range(1, len(job)):
-            d_prev = job[o - 1][1]
-            prob += starts[(j, o)] >= starts[(j, o - 1)] + d_prev
-
-    # Maschinenkonflikte
-    bigM = 1e5
-    for m in all_machines:
-        ops = [(j, o, d) for j in range(num_jobs)
-               for o, (mach, d) in enumerate(all_ops[j]) if mach == m]
-        for i in range(len(ops)):
-            j1, o1, d1 = ops[i]
-            for j2, o2, d2 in ops[i + 1:]:
-                if j1 != j2:
-                    y = pulp.LpVariable(f"y_{j1}_{o1}_{j2}_{o2}", cat="Binary")
-                    prob += starts[(j1, o1)] + d1 + epsilon <= starts[(j2, o2)] + bigM * (1 - y)
-                    prob += starts[(j2, o2)] + d2 + epsilon <= starts[(j1, o1)] + bigM * y
-
-    # Endzeit je Job = Ende letzter Operation
-    for j in range(num_jobs):
-        last_op = len(all_ops[j]) - 1
-        prob += job_ends[j] >= starts[(j, last_op)] + all_ops[j][last_op][1]
-
-    # Solver
-    solver = pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit)
-    prob.solve(solver)
-
-    # Ergebnisse extrahieren
-    schedule_data = []
-    for (j, o), var in sorted(starts.items()):
-        start = var.varValue
-        if start is not None:
-            machine, duration = all_ops[j][o]
-            end = start + duration
-            schedule_data.append({
-                "Job": job_names[j],
-                "Machine": f"M{machine}",
-                "Start": round(start, 2),
-                "Processing Time": duration,
-                "End": round(end, 2)
-            })
-
-    df_schedule = pd.DataFrame(schedule_data)
-
-    df_schedule["Arrival"] = df_schedule["Job"].map(arrival_times)
-    df_schedule["Flow time"] = df_schedule["End"] - df_schedule["Arrival"]
-
-    df_schedule = df_schedule[["Job", "Arrival", "Machine", "Start", "Processing Time", "Flow time", "End"]]
-
-    # Gesamtzielwert
-    total_weighted_flowtime = round(pulp.value(prob.objective), 3)
-
-    return df_schedule, total_weighted_flowtime
-
-
-## Two Stages --------------------------------------------------------------------------------------------------------------
-# --------------------------------------------------------------------------------------------------------------------------
-
-
-def solve_jssp_global_makespan(job_dict, df_arrivals, solver_time_limit=300, epsilon=0.00):
+# MILP with HiGHS - minimizing the entire Makespan -----------------------------------------------------------------
+def solve_jssp_global_makespan(job_dict, df_arrivals, solver_time_limit=300, epsilon=0.06):
     """
     Erste Stufe: Minimierung des Makespan (Gesamtdauer) eines Job-Shop-Problems.
 
@@ -341,11 +233,11 @@ def solve_jssp_global_makespan(job_dict, df_arrivals, solver_time_limit=300, eps
 
 
     # Ankunftszeiten als Dictionary
-    df_arrivals = df_arrivals.sort_values("Ankunftszeit (Minuten)").reset_index(drop=True)
-    arrival_times = df_arrivals.set_index("Job-ID")["Ankunftszeit (Minuten)"].to_dict()
+    df_arrivals = df_arrivals.sort_values("Arrival").reset_index(drop=True)
+    arrival_times = df_arrivals.set_index("Job")["Arrival"].to_dict()
 
     # Jobnamen nach Ankunftszeit sortieren (absteigend)
-    job_names = list(df_arrivals.sort_values("Ankunftszeit (Minuten)", ascending=False)["Job-ID"])
+    job_names = list(df_arrivals.sort_values("Arrival", ascending=False)["Job"])
 
     num_jobs = len(job_names)
     
@@ -367,9 +259,6 @@ def solve_jssp_global_makespan(job_dict, df_arrivals, solver_time_limit=300, eps
     # Makespan-Variable
     makespan = pulp.LpVariable("makespan", lowBound=0, cat="Continuous")
     prob += makespan  # Ziel 1: Makespan minimieren
-
-    # Ankunftszeiten berücksichtigen
-    #arrival_times = df_arrivals.set_index("Job-ID")["Ankunftszeit (Minuten)"].to_dict()
 
     # Technologische Reihenfolge und Ankunftszeit
     for j, job_name in enumerate(job_names):
@@ -429,99 +318,67 @@ def solve_jssp_global_makespan(job_dict, df_arrivals, solver_time_limit=300, eps
     return df_schedule, makespan_value
 
 
+# Dispatching Rules -----------------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------------
 
-def solve_stage2_early_starts_all(job_dict, df_arrivals, optimal_makespan, solver_time_limit=300, epsilon=0.06):
+# FCFS schedules operations by their earliest possible start time, breaking ties in favor of the job that arrived first
+def schedule_fcfs_with_arrivals(jobs: Dict[int, List[Tuple[int, float]]],
+                                arrival_df: pd.DataFrame) -> pd.DataFrame:
     """
-    Zweite Stufe: Minimierung der Summe aller Startzeiten unter Fixierung des Makespan (verbesserte Version).
-
-    Parameter:
-    - job_dict: Dictionary der Jobs mit Maschinen- und Bearbeitungszeiten.
-    - df_arrivals: DataFrame mit Ankunftszeiten der Jobs.
-    - optimal_makespan: Optimales Makespan aus Stufe 1 (fester Endzeitpunkt).
-    - solver_time_limit: Zeitlimit für den Solver (Sekunden).
-    - epsilon: Kleiner Sicherheitsabstand zwischen Operationen auf derselben Maschine.
+    FCFS-Scheduling mit Job-Ankunftszeiten.
     """
+    # --- Vorbereitungen -----------------------------------------------------
+    arrival_times = (
+        arrival_df.set_index("Job")["Arrival"]
+        .to_dict()
+    )
 
-    # Ankunftszeiten als Dictionary
-    df_arrivals = df_arrivals.sort_values("Ankunftszeit (Minuten)").reset_index(drop=True)
-    arrival_times = df_arrivals.set_index("Job-ID")["Ankunftszeit (Minuten)"].to_dict()
+    # Zustand der Jobs und Maschinen
+    next_op_idx  = {job: 0                       for job in jobs}               # nächste Op-Nr.
+    job_ready    = {job: arrival_times[job]      for job in jobs}               # frühester Start
+    machine_ready = defaultdict(float)                                              # frei ab
+    remaining_ops = sum(len(ops) for ops in jobs.values())
 
-    # Jobnamen nach Ankunftszeit sortieren (absteigend)
-    job_names = list(df_arrivals.sort_values("Ankunftszeit (Minuten)", ascending=False)["Job-ID"])
+    schedule = []
 
-    num_jobs = len(job_names)
-    
-    all_ops = [job_dict[job_name] for job_name in job_names]
+    # --- Hauptschleife ------------------------------------------------------
+    while remaining_ops:
+        chosen = None         # (job, machine, duration, earliest_start)
 
-    all_machines = {op[0] for job in all_ops for op in job}
+        # Suche beste nächste Operation (globale FCFS-Logik)
+        for job, idx in next_op_idx.items():
+            if idx >= len(jobs[job]):
+                continue   # Job fertig
 
-    prob = pulp.LpProblem("JobShop_Secondary_EarlyStart", pulp.LpMinimize)
+            machine, duration = jobs[job][idx]
+            earliest_start    = max(job_ready[job], machine_ready[machine])
 
-    # Startzeit-Variablen
-    starts = {
-        (j, o): pulp.LpVariable(f"start_{j}_{o}", lowBound=0, cat="Continuous")
-        for j in range(num_jobs) for o in range(len(all_ops[j]))
-    }
+            if (chosen is None or
+                earliest_start < chosen[3] or
+                (earliest_start == chosen[3] and arrival_times[job] < arrival_times[chosen[0]])):
+                chosen = (job, machine, duration, earliest_start)
 
-    # Ankunftszeiten vorbereiten
-    #arrival_times = df_arrivals.set_index("Job-ID")["Ankunftszeit (Minuten)"].to_dict()
-
-    # Technologische Reihenfolge und Ankunftszeiten einfügen
-    for j, job_name in enumerate(job_names):
-        job = job_dict[job_name]
-        prob += starts[(j, 0)] >= arrival_times[job_name]
-        for o in range(1, len(job)):
-            d_prev = job[o - 1][1]
-            prob += starts[(j, o)] >= starts[(j, o - 1)] + d_prev
-
-    # Maschinenkonflikte (mit epsilon Abstand)
-    bigM = 1e5
-    for m in all_machines:
-        ops = [(j, o, d) for j in range(num_jobs)
-               for o, (mach, d) in enumerate(all_ops[j]) if mach == m]
-        for i in range(len(ops)):
-            j1, o1, d1 = ops[i]
-            for j2, o2, d2 in ops[i + 1:]:
-                if j1 != j2:
-                    y = pulp.LpVariable(f"y_{j1}_{o1}_{j2}_{o2}", cat="Binary")
-                    prob += starts[(j1, o1)] + d1 + epsilon <= starts[(j2, o2)] + bigM * (1 - y)
-                    prob += starts[(j2, o2)] + d2 + epsilon <= starts[(j1, o1)] + bigM * y
-
-    # Fixierter Makespan: Endzeit der letzten Operationen darf den optimalen Makespan nicht überschreiten
-    for j in range(num_jobs):
-        last_op = len(all_ops[j]) - 1
-        prob += starts[(j, last_op)] + all_ops[j][last_op][1] <= optimal_makespan
-
-    # ZIEL: Minimierung der Summe aller Startzeiten (nicht nur der ersten Operationen)
-    total_start = pulp.lpSum([starts[(j, o)] for j in range(num_jobs) for o in range(len(all_ops[j]))])
-    prob += total_start
-
-    # Solver starten
-    solver = pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit)
-    prob.solve(solver)
-
-    # Ergebnisse extrahieren
-    schedule_data = []
-    for (j, o), var in sorted(starts.items()):
-        start = var.varValue
-        if start is not None:
-            machine, duration = all_ops[j][o]
-            end = start + duration
-            schedule_data.append({
-                "Job": job_names[j],
-                "Machine": f"M{machine}",
-                "Start": round(start, 2),
+        # Plane die gewählte Operation
+        job, machine, duration, start = chosen
+        end = start + duration
+        schedule.append(
+            {
+                "Job":      f"{job}",
+                "Machine":  f"M{machine}",
+                "Start":    start,
                 "Processing Time": duration,
-                "End": round(end, 2)
-            })
+                "End":      end,
+            }
+        )
 
-    df_schedule = pd.DataFrame(schedule_data)
+        # Zustände aktualisieren
+        job_ready[job]         = end
+        machine_ready[machine] = end
+        next_op_idx[job]      += 1
+        remaining_ops         -= 1
 
+    df_schedule = pd.DataFrame(schedule)
     df_schedule["Arrival"] = df_schedule["Job"].map(arrival_times)
-    df_schedule["Flow time"] = df_schedule["End"] - df_schedule["Arrival"]
+    df_schedule = df_schedule[["Job", "Arrival", "Machine", "Start", "Processing Time", "End"]]
 
-    # Spaltenreihenfolge anpassen
-    df_schedule = df_schedule[["Job", "Arrival", "Machine", "Start", "Processing Time", "Flow time", "End"]]
-    
-    return df_schedule, optimal_makespan
-
+    return df_schedule.sort_values(by=["Arrival", "Start"])
