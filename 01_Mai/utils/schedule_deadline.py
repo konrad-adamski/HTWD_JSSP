@@ -1,15 +1,15 @@
 import pandas as pd
 
 
-def find_k(jobs: dict, arrivals: pd.DataFrame, schedule_func, target_service=0.95, final_buffer: float = 0.0):
+def find_k(jobs: dict, arrivals: pd.DataFrame, schedule_func, target_service=0.95, buffer_factor: float = 1.0):
     """sucht k via Binärsuche; Schedule einmal vorterminiert"""
     
     # 1) einmaligen Schedule holen (für z.B. FCFS o.ä., der nicht deadline‐abhängig ist)
     sched = schedule_func(jobs, arrivals)
     
     # 2) Binärsuche
-    lo, hi = 0.5, 5.0                      # Startintervall (evtl. anpassen)
-    for _ in range(20):                    # 20 Iterationen ≈ 1/2^20 Genauigkeit            
+    lo, hi = 0.5, 10.0                      # Startintervall (evtl. anpassen)
+    for _ in range(30):                     # 30 Iterationen ≈ 1/2^30 Genauigkeit            
         k = (lo + hi) / 2
         d = _calc_due_dates(jobs, arrivals, k)
         
@@ -20,13 +20,13 @@ def find_k(jobs: dict, arrivals: pd.DataFrame, schedule_func, target_service=0.9
         else:
             lo = k                          # Deadlines zu eng
 
-    # Deadlines
-    if final_buffer > 0:
-        d = _calc_due_dates(jobs, arrivals, k, buffer=final_buffer)
+    # Deadlines * Faktor
+    if buffer_factor > 1:
+        d = _calc_due_dates(jobs, arrivals, k, buffer_factor=buffer_factor)
     return k, d
 
 
-def _calc_due_dates(jobs: dict, arrivals: pd.DataFrame, k: float, buffer: float = 0.0) -> dict:
+def _calc_due_dates(jobs: dict, arrivals: pd.DataFrame, k: float, buffer_factor: float = 1.0) -> dict:
     """
     Berechnet Deadlines für jedes Job j als
       d_j = a_j + (k + buffer)*p_j
@@ -36,4 +36,4 @@ def _calc_due_dates(jobs: dict, arrivals: pd.DataFrame, k: float, buffer: float 
     # Ankunftszeiten a_j
     a = arrivals.set_index("Job")["Arrival"].to_dict()
     # Deadline-Berechnung
-    return {j: a[j] + (k + buffer) * p_tot[j] for j in jobs}
+    return {j: a[j] + (k * p_tot[j]) * buffer_factor for j in jobs}
