@@ -119,10 +119,12 @@ def plot_gantt_machines(schedule_df: pd.DataFrame, title: str = "Gantt-Diagramm 
 
     # Achsenlimits
     max_time = (schedule_df['Start'] + schedule_df[duration_column]).max()
-    ax.set_xlim(0, max_time * 1.05)
+
+    x_start = int((schedule_df['Start'].min() // 1440) * 1440)
+    ax.set_xlim(x_start, max_time + 120)
 
     # Vertikale Linien alle 1440 Einheiten (z.B. 1 Tag bei Minuten)
-    for x in range(0, int(max_time) + 1440, 1440):
+    for x in range(x_start, int(max_time) + 1440, 1440):
         ax.axvline(x=x, color='gray', linestyle=':', linewidth=0.8, alpha=0.6)
 
     plt.tight_layout()
