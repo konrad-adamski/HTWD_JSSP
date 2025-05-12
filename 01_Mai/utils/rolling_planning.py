@@ -153,6 +153,7 @@ def create_new_arrivals(numb_jobs: int, mean_interarrival_time: float, start_tim
 
     # 2) Interarrival-Zeiten erzeugen
     interarrival_times = np.random.exponential(scale=mean_interarrival_time, size=numb_jobs)
+    # interarrival_times[0] = 0.0  # Start bei 0 Minuten
 
     # 3) Kumulieren ab last_arrival und auf 2 Nachkommastellen runden
     new_arrivals = np.round(start_time + np.cumsum(interarrival_times), 2)

@@ -1,5 +1,7 @@
 import pandas as pd
 
+
+# minimiert die gewichtete Flow-Time
 def solve_jssp_weighted_with_fixed_operations_fast(job_dict, df_arrivals, df_executed,
                                                     solver_time_limit=300, epsilon=0.0,
                                                     arrival_column="Ankunftszeit (Minuten)",
