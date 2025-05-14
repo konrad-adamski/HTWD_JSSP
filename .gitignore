@@ -5,5 +5,12 @@ idea/
 ipynb_checkpoints/
 
 
+*.pyc
 
+__pycache__/
 
+# Umgebungen und Umgebungsdateien
+.env
+.venv/
+venv/
+env/
