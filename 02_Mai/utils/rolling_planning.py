@@ -3,7 +3,7 @@ import random
 import numpy as np
 import pandas as pd
 
-import utils.simple.schedule_solver as ssv
+import utils.simple.schedule_solver__arrival as ssv
 import utils.deadline.generator as deadline_gen
 import utils.schedule_interarrival as sit
 
