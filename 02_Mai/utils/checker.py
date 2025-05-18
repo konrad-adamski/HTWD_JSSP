@@ -34,26 +34,24 @@ def is_machine_conflict_free(df_schedule: pd.DataFrame) -> bool:
         return True
 
 
+# neu
 def is_operation_sequence_correct(df_schedule: pd.DataFrame) -> bool:
     """
-    Prüft, ob für jeden Job im Schedule die Operation-Indizes vollständig
-    und in der richtigen Sequenz von 0 bis (n_ops - 1) vorhanden sind.
+    Prüft, ob für jeden Job die Operationen fortlaufend, aufsteigend und lückenlos sind.
 
     Parameter:
-    - df_schedule: DataFrame mit Spalten ['Job','Operation', …]
+    - df_schedule: DataFrame mit Spalten ['Job', 'Operation', …]
 
     Rückgabe:
-    - True, wenn jeder Job genau die Indizes 0,1,…,n-1 ohne Lücken und Duplikate hat.
+    - True, wenn jeder Job eine fortlaufende und lückenlose Operationssequenz aufweist.
       Sonst False und Ausgabe der betroffenen Jobs.
     """
     violations = []
     for job, grp in df_schedule.groupby('Job', sort=False):
-        ops = grp['Operation'].tolist()
-        n = len(ops)
-        expected = list(range(n))
-        actual = sorted(ops)
-        if actual != expected:
-            violations.append((job, expected, actual))
+        ops = sorted(grp['Operation'].tolist())
+        expected = list(range(ops[0], ops[-1] + 1))
+        if ops != expected:
+            violations.append((job, expected, ops))
 
     if not violations:
         print("✅ Für alle Jobs ist die Operationssequenz korrekt.")
@@ -63,6 +61,7 @@ def is_operation_sequence_correct(df_schedule: pd.DataFrame) -> bool:
     for job, exp, act in violations:
         print(f"  Job {job!r}: erwartet Indizes {exp}, gefunden {act}")
     return False
+
 
 
 
