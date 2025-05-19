@@ -116,9 +116,6 @@ def solve_jssp_global_makespan(df_jssp: pd.DataFrame,
 
 
 
-import pandas as pd
-from collections import defaultdict
-
 def schedule_fcfs_with_arrivals(df_jssp: pd.DataFrame,
                                 arrival_df: pd.DataFrame) -> pd.DataFrame:
     """

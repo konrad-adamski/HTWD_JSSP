@@ -2,9 +2,6 @@ import pulp
 import pandas as pd
 import re
 
-import pandas as pd
-import pulp
-import re
 
 def solve_jssp_weighted_individual_flowtime_with_fixed_ops(
     df_jssp: pd.DataFrame,
@@ -325,3 +322,4 @@ def solve_jssp_individual_flowtime_with_fixed_ops(
     df_schedule = df_schedule.sort_values(['Arrival', 'Start']).reset_index(drop=True)
     print("✅ Fertig!")
     return df_schedule
+
