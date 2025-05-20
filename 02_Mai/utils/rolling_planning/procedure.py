@@ -80,12 +80,15 @@ def extend_with_undone_operations(
     # Relevante Spalten aus df_undone
     df_undone_relevant = df_undone[['Job', 'Operation', 'Machine', 'Processing Time']].copy()
 
+    # Explizite Kopie von df_jssp_todo zur sicheren Bearbeitung
+    df_jssp_todo_copy = df_jssp_todo.copy()
+
     # Einheitlicher Datentyp für 'Job'
     df_undone_relevant['Job'] = df_undone_relevant['Job'].astype(str)
-    df_jssp_todo['Job'] = df_jssp_todo['Job'].astype(str)
+    df_jssp_todo_copy['Job'] = df_jssp_todo_copy['Job'].astype(str)
 
     # Kombination beider DataFrames
-    df_combined = pd.concat([df_undone_relevant, df_jssp_todo], ignore_index=True)
+    df_combined = pd.concat([df_undone_relevant, df_jssp_todo_copy], ignore_index=True)
 
     # Doppelte Operationen entfernen
     df_combined.drop_duplicates(subset=['Job', 'Operation'], inplace=True)
@@ -94,6 +97,7 @@ def extend_with_undone_operations(
     df_combined.reset_index(drop=True, inplace=True)
 
     return df_combined
+
 
 
 # IIc  
