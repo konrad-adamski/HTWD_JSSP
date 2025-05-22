@@ -216,7 +216,7 @@ def solve_jssp_individual_flowtime(df_jssp: pd.DataFrame,
 def solve_jssp_weighted_individual_flowtime(df_jssp: pd.DataFrame,
                                             df_arrivals: pd.DataFrame,
                                             solver_time_limit: int = 300,
-                                            epsilon: float = 0.0):
+                                            epsilon: float = 0.0, threads= None):
     """
     Minimiert die gewichtete Summe der individuellen Durchlaufzeiten aller Jobs.
     Gewicht_j = 1 / (1 + Arrival_j)
@@ -292,7 +292,10 @@ def solve_jssp_weighted_individual_flowtime(df_jssp: pd.DataFrame,
                 prob += sj + dj + epsilon <= si + M*y
 
     # Solve
-    prob.solve(pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit))
+    if threads: 
+        prob.solve(pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit, threads= threads))
+    else:
+        prob.solve(pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit))
 
     # Extract schedule
     recs = []
