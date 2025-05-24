@@ -216,7 +216,7 @@ def solve_jssp_individual_flowtime(df_jssp: pd.DataFrame,
 def solve_jssp_weighted_individual_flowtime(df_jssp: pd.DataFrame,
                                             df_arrivals: pd.DataFrame,
                                             solver_time_limit: int = 300,
-                                            epsilon: float = 0.0, threads= None):
+                                            epsilon: float = 0.0, msg_print = False, threads= None):
     """
     Minimiert die gewichtete Summe der individuellen Durchlaufzeiten aller Jobs.
     Gewicht_j = 1 / (1 + Arrival_j)
@@ -293,9 +293,9 @@ def solve_jssp_weighted_individual_flowtime(df_jssp: pd.DataFrame,
 
     # Solve
     if threads: 
-        prob.solve(pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit, threads= threads))
+        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit, threads= threads))
     else:
-        prob.solve(pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit))
+        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit))
 
     # Extract schedule
     recs = []
@@ -313,10 +313,18 @@ def solve_jssp_weighted_individual_flowtime(df_jssp: pd.DataFrame,
             'End': round(end, 2)
         })
 
-    df_schedule = pd.DataFrame(recs) \
-        .sort_values(['Arrival','Start']) \
-        .reset_index(drop=True)
+    df_schedule = pd.DataFrame(recs).sort_values(['Arrival','Start']).reset_index(drop=True)
 
-    total_weighted_flowtime = round(pulp.value(prob.objective), 3)
+    # Solver-Status & Informationen
+    status = pulp.LpStatus[prob.status]
+    objective_value = pulp.value(prob.objective)
+    num_constraints = len(prob.constraints)
+    num_variables = len(prob.variables())
+    
+    print("\nSolver-Informationen:")
+    print(f"  Zielfunktionswert       : {round(objective_value, 4)}")
+    print(f"  Solver-Status           : {status}")
+    print(f"  Anzahl Variablen        : {num_variables}")
+    print(f"  Anzahl Constraints      : {num_constraints}")
     return df_schedule
 
