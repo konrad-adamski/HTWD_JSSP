@@ -271,8 +271,12 @@ def add_beforehand_jobs_to_current_horizon(df_existing_jobs: pd.DataFrame,
     )
 
     # Kombinieren mit bestehenden Daten
-    df_combined_jobs = pd.concat([df_existing_jobs, df_sampled_jobs], ignore_index=True)
-    df_combined_times = pd.concat([df_existing_times, df_sampled_times], ignore_index=True)
+    if not df_sampled_times.empty:
+        df_combined_jobs = pd.concat([df_existing_jobs, df_sampled_jobs], ignore_index=True)
+        df_combined_times = pd.concat([df_existing_times, df_sampled_times], ignore_index=True)
+    else:
+        df_combined_jobs = df_existing_jobs.copy()
+        df_combined_times = df_existing_times.copy()
 
     return df_combined_jobs, df_combined_times
 
