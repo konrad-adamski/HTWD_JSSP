@@ -10,7 +10,7 @@ def solve_jssp_sum_tardiness(
     df_jssp: pd.DataFrame,
     df_arrivals_deadlines: pd.DataFrame,
     solver_time_limit: int = 1200,
-    epsilon: float = 0.0
+    epsilon: float = 0.0, msg_print=False, threads=None
 ) -> pd.DataFrame:
     """
     Minimiert die Summe der Tardiness (Verspätungen) aller Jobs.
@@ -104,7 +104,12 @@ def solve_jssp_sum_tardiness(
                 prob += starts[(j2, o2)] + d2 + epsilon <= starts[(j1, o1)] + bigM*y
 
     # Lösen
-    prob.solve(pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit))
+    if threads:
+        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit, threads=threads))
+    else:
+        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit))
+
+
     total_tardiness = pulp.value(prob.objective)
 
     # Ergebnis extrahieren

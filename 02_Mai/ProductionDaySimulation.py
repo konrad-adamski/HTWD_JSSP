@@ -140,15 +140,14 @@ class ProductionDaySimulation:
     
         if jobs_started == 0:
             print("⚠️ Kein Job startet innerhalb des Zeitfensters – Simulation wird abgebrochen.")
-            return pd.DataFrame(), pd.DataFrame()
+            return pd.DataFrame(columns=self.dframe_schedule_plan.columns), self.dframe_schedule_plan
     
         try:
             self.env.run(until=self.stop_event)
         except RuntimeError as e:
             print("⚠️ Simulation wurde unerwartet beendet:", e)
-            return pd.DataFrame(), pd.DataFrame()
-
-        
+            return pd.DataFrame(columns=self.dframe_schedule_plan.columns), self.dframe_schedule_plan
+    
         dframe_execution = pd.DataFrame(self.finished_log)
         # Arrival aus df_plan mappen
         arrival_map = self.dframe_schedule_plan[["Job", "Machine", "Arrival"]].drop_duplicates()
