@@ -135,6 +135,14 @@ def solve_jssp_sum_tardiness(
           .sort_values(["Arrival", "Start", "Job"])
           .reset_index(drop=True)
     )
+
+    # Log
+    print("\nSolver-Informationen:")
+    print(f"  Zielfunktionswert       : {round(pulp.value(prob.objective), 4)}")
+    print(f"  Solver-Status           : {pulp.LpStatus[prob.status]}")
+    print(f"  Anzahl Variablen        : {len(prob.variables())}")
+    print(f"  Anzahl Constraints      : {len(prob.constraints)}")
+    
     return df_schedule
 
 

@@ -3,6 +3,7 @@ import re
 import pulp
 import pandas as pd
 
+import utils.reschedule.bigM_estimator as bigM_func
 
 def solve_jssp_bi_criteria_sum_tardiness_deviation_with_fixed_ops(
     df_jssp: pd.DataFrame,
@@ -106,7 +107,8 @@ def solve_jssp_bi_criteria_sum_tardiness_deviation_with_fixed_ops(
             prob += starts[(j, o)] >= starts[(j, o-1)] + dur_prev
 
     # Maschinenkonflikte
-    M = 1e5
+    M = bigM_func.estimate_bigM_with_deadline_and_original_plan(df_jssp, df_arrivals_deadlines, df_original_plan)
+    
     for m in sorted(all_machines):
         ops_on_m = [
             (j, o, all_ops[j][o][2])
@@ -179,7 +181,8 @@ def solve_jssp_sum_tardiness_with_fixed_ops(
     df_executed: pd.DataFrame,
     solver_time_limit: int = 1200,
     epsilon: float = 0.0,
-    reschedule_start: float = 1440.0
+    reschedule_start: float = 1440.0,
+    msg_print=False, threads=None
 ) -> pd.DataFrame:
     """
     Minimiert die Summe der Tardiness unter Berücksichtigung bereits ausgeführter Operationen (fixe Belegung).
@@ -259,7 +262,7 @@ def solve_jssp_sum_tardiness_with_fixed_ops(
         prob += tard[j] >= ends[j] - deadline[job]
 
     # Maschinenkonflikte
-    bigM = 1e6
+    bigM = bigM_func.estimate_bigM_with_deadline(df_jssp, df_arrivals_deadlines)
     for m in machines:
         ops_on_m = [
             (j, o, all_ops[j][o][2])
@@ -282,7 +285,10 @@ def solve_jssp_sum_tardiness_with_fixed_ops(
                 prob += fixed_end + epsilon <= starts[(j1, o1)] + bigM * y_fix
 
     # Lösen
-    prob.solve(pulp.HiGHS_CMD(msg=True, timeLimit=solver_time_limit))
+    if threads:
+        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit, threads=threads))
+    else:
+        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit))
 
     # Ergebnis extrahieren
     records = []
@@ -305,6 +311,14 @@ def solve_jssp_sum_tardiness_with_fixed_ops(
             })
 
     df_schedule = pd.DataFrame(records).sort_values(["Arrival", "Start", "Job"]).reset_index(drop=True)
+
+    # Log
+    print("\nSolver-Informationen:")
+    print(f"  Zielfunktionswert       : {round(pulp.value(prob.objective), 4)}")
+    print(f"  Solver-Status           : {pulp.LpStatus[prob.status]}")
+    print(f"  Anzahl Variablen        : {len(prob.variables())}")
+    print(f"  Anzahl Constraints      : {len(prob.constraints)}")
+    
     return df_schedule
 
 
