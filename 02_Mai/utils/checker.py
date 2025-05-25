@@ -10,7 +10,7 @@ def is_machine_conflict_free(df_schedule: pd.DataFrame) -> bool:
     Gibt True zurück, wenn konfliktfrei.
     Gibt False zurück und druckt die Konflikte, wenn Konflikte existieren.
     """
-    df = df_schedule.sort_values(["Machine", "Start"]).reset_index(drop=True)
+    df = df_schedule.sort_values(["Machine", "Start"]).reset_index()
     conflict_indices = []
 
     for machine in df["Machine"].unique():
@@ -21,7 +21,7 @@ def is_machine_conflict_free(df_schedule: pd.DataFrame) -> bool:
             curr = machine_df.iloc[i]
 
             if curr["Start"] < prev["End"]:
-                conflict_indices.extend([prev.name, curr.name])
+                conflict_indices.extend([prev["index"], curr["index"]])
 
     conflict_indices = sorted(set(conflict_indices))
 
