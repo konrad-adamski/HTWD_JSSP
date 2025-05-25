@@ -12,7 +12,7 @@ def solve_jssp_bi_criteria_sum_tardiness_deviation_with_fixed_ops(
     df_original_plan: pd.DataFrame,
     r: float = 0.5,
     solver_time_limit: int = 300,
-    epsilon: float = 0.0,
+    epsilon: float = 0.6,
     arrival_column: str = "Arrival",
     deadline_column: str = "Deadline",
     reschedule_start: float = 1440.0, 
@@ -180,7 +180,7 @@ def solve_jssp_sum_tardiness_with_fixed_ops(
     df_arrivals_deadlines: pd.DataFrame,
     df_executed: pd.DataFrame,
     solver_time_limit: int = 1200,
-    epsilon: float = 0.0,
+    epsilon: float = 0.6,
     reschedule_start: float = 1440.0,
     msg_print=False, threads=None, sort_ascending=False
 ) -> pd.DataFrame:
