@@ -182,7 +182,7 @@ def solve_jssp_sum_tardiness_with_fixed_ops(
     solver_time_limit: int = 1200,
     epsilon: float = 0.0,
     reschedule_start: float = 1440.0,
-    msg_print=False, threads=None
+    msg_print=False, threads=None, sort_ascending=False
 ) -> pd.DataFrame:
     """
     Minimiert die Summe der Tardiness unter Berücksichtigung bereits ausgeführter Operationen (fixe Belegung).
@@ -199,7 +199,7 @@ def solve_jssp_sum_tardiness_with_fixed_ops(
     - df_schedule: DataFrame mit ['Job','Operation','Arrival','Deadline','Machine',
                                   'Start','Processing Time','End','Tardiness']
     """
-    df_arr = df_arrivals_deadlines.sort_values("Arrival").reset_index(drop=True)
+    df_arr = df_arrivals_deadlines.sort_values("Deadline", ascending=sort_ascending).reset_index(drop=True)
     arrival = df_arr.set_index("Job")["Arrival"].to_dict()
     deadline = df_arr.set_index("Job")["Deadline"].to_dict()
     jobs = df_arr["Job"].tolist()
