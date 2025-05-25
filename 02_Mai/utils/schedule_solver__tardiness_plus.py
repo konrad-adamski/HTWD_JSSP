@@ -4,13 +4,23 @@ import re
 import pulp
 import pandas as pd
 
+import math
+
 # Tardiness ---------------------------------------------------------------------------------------
 # SUM
+import pandas as pd
+import pulp
+import math
+import re
+
 def solve_jssp_sum_tardiness(
     df_jssp: pd.DataFrame,
     df_arrivals_deadlines: pd.DataFrame,
     solver_time_limit: int = 1200,
-    epsilon: float = 0.0, msg_print=False, threads=None, sort_ascending=False
+    epsilon: float = 0.6,
+    msg_print: bool = False,
+    threads: int = None,
+    sort_ascending: bool = False
 ) -> pd.DataFrame:
     """
     Minimiert die Summe der Tardiness (Verspätungen) aller Jobs.
@@ -25,7 +35,6 @@ def solve_jssp_sum_tardiness(
     Rückgabe:
     - df_schedule: DataFrame mit ['Job','Operation','Arrival','Deadline',
       'Machine','Start','Processing Time','End','Tardiness'].
-    - total_tardiness: Summe aller Tardiness (float).
     """
     # Vorverarbeitung
     df_arrivals_deadlines = df_arrivals_deadlines.sort_values("Deadline", ascending=sort_ascending).reset_index(drop=True)
@@ -33,9 +42,17 @@ def solve_jssp_sum_tardiness(
     deadline = df_arrivals_deadlines.set_index("Job")["Deadline"].to_dict()
     jobs = df_arrivals_deadlines["Job"].tolist()
 
-    # Operations pro Job
-    # all_ops[j] = list of (Operation, machine_id(int), duration)
-    ops_grouped = df_jssp.sort_values(["Job","Operation"]).groupby("Job")
+    # Infos für bigM
+    max_deadline = max(deadline.values())
+    max_proc_time = max(df_jssp["Processing Time"])
+    min_arrival = min(arrival.values())
+
+    bigM_raw = max_deadline - min_arrival + max_proc_time*4
+    bigM = math.ceil(bigM_raw / 100) * 100 *2
+    print(f"BigM: {bigM}")
+
+    # Operationen je Job
+    ops_grouped = df_jssp.sort_values(["Job", "Operation"]).groupby("Job")
     all_ops = []
     machines = set()
     for job in jobs:
@@ -49,20 +66,28 @@ def solve_jssp_sum_tardiness(
         all_ops.append(seq)
 
     n = len(jobs)
-    bigM = 1e6
 
     # LP-Problem
     prob = pulp.LpProblem("JSSP_Sum_Tardiness", pulp.LpMinimize)
 
     # Variablen
     starts = {
-        (j, o): pulp.LpVariable(f"start_{j}_{o}", lowBound=0)
-        for j in range(n) for o in range(len(all_ops[j]))
+        (j, o): pulp.LpVariable(
+            f"start_{j}_{o}",
+            lowBound=arrival[jobs[j]]
+        )
+        for j in range(n)
+        for o in range(len(all_ops[j]))
     }
+
     ends = {
-        j: pulp.LpVariable(f"end_{j}", lowBound=0)
+        j: pulp.LpVariable(
+            f"end_{j}",
+            lowBound=arrival[jobs[j]]
+        )
         for j in range(n)
     }
+
     tard = {
         j: pulp.LpVariable(f"tardiness_{j}", lowBound=0)
         for j in range(n)
@@ -71,20 +96,24 @@ def solve_jssp_sum_tardiness(
     # Zielfunktion
     prob += pulp.lpSum(tard[j] for j in range(n))
 
-    # Technologische Reihenfolge & Ankunft
+    
+    # Technologische Reihenfolge und Tardiness
     for j, job in enumerate(jobs):
         seq = all_ops[j]
-        # erste Operation ≥ arrival
-        prob += starts[(j, 0)] >= arrival[job]
-        # Folge-OPs
-        for o in range(1, len(seq)):
-            _, _, prev_d = seq[o-1]
-            prob += starts[(j, o)] >= starts[(j, o-1)] + prev_d
-        # Endzeit
-        _, _, last_d = seq[-1]
-        prob += ends[j] == starts[(j, len(seq)-1)] + last_d
-        # Tardiness
+        num_ops = len(seq)
+    
+        # Technologische Reihenfolge: jede OP nach der vorherigen
+        for o in range(1, num_ops):
+            duration_prev = seq[o - 1][2]
+            prob += starts[(j, o)] >= starts[(j, o - 1)] + duration_prev
+    
+        # Endzeit = letzte Startzeit + Dauer der letzten OP
+        duration_last = seq[-1][2]
+        prob += ends[j] == starts[(j, num_ops - 1)] + duration_last
+    
+        # Tardiness ≥ Endzeit - Deadline
         prob += tard[j] >= ends[j] - deadline[job]
+
 
     # Maschinenkonflikte
     for m in machines:
@@ -96,19 +125,16 @@ def solve_jssp_sum_tardiness(
         ]
         for i in range(len(ops_on_m)):
             j1, o1, d1 = ops_on_m[i]
-            for j2, o2, d2 in ops_on_m[i+1:]:
+            for j2, o2, d2 in ops_on_m[i + 1:]:
                 if j1 == j2:
                     continue
                 y = pulp.LpVariable(f"y_{j1}_{o1}_{j2}_{o2}", cat="Binary")
-                prob += starts[(j1, o1)] + d1 + epsilon <= starts[(j2, o2)] + bigM*(1-y)
-                prob += starts[(j2, o2)] + d2 + epsilon <= starts[(j1, o1)] + bigM*y
+                prob += starts[(j1, o1)] + d1 + epsilon <= starts[(j2, o2)] + bigM * (1 - y)
+                prob += starts[(j2, o2)] + d2 + epsilon <= starts[(j1, o1)] + bigM * y
 
     # Lösen
-    if threads:
-        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit, threads=threads))
-    else:
-        prob.solve(pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit))
-
+    solver = pulp.HiGHS_CMD(msg=msg_print, timeLimit=solver_time_limit, threads=threads)
+    prob.solve(solver)
 
     total_tardiness = pulp.value(prob.objective)
 
@@ -132,18 +158,19 @@ def solve_jssp_sum_tardiness(
 
     df_schedule = (
         pd.DataFrame.from_records(records)
-          .sort_values(["Arrival", "Start", "Job"])
-          .reset_index(drop=True)
+        .sort_values(["Arrival", "Start", "Job"])
+        .reset_index(drop=True)
     )
 
     # Log
     print("\nSolver-Informationen:")
-    print(f"  Zielfunktionswert       : {round(pulp.value(prob.objective), 4)}")
+    print(f"  Zielfunktionswert       : {round(total_tardiness, 4)}")
     print(f"  Solver-Status           : {pulp.LpStatus[prob.status]}")
     print(f"  Anzahl Variablen        : {len(prob.variables())}")
     print(f"  Anzahl Constraints      : {len(prob.constraints)}")
-    
+
     return df_schedule
+
 
 
 # MAX
