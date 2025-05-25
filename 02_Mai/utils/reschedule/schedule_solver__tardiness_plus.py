@@ -16,7 +16,7 @@ def solve_jssp_bi_criteria_sum_tardiness_deviation_with_fixed_ops(
     arrival_column: str = "Arrival",
     deadline_column: str = "Deadline",
     reschedule_start: float = 1440.0, 
-    msg_print=False, threads=None
+    msg_print=False, threads=None, sort_ascending=False
 ) -> pd.DataFrame:
     """
     Bi-kriterielles Rescheduling: Tardiness + Planabweichung mit fixierten Operationen.
@@ -26,7 +26,7 @@ def solve_jssp_bi_criteria_sum_tardiness_deviation_with_fixed_ops(
     - df_schedule mit ['Job','Operation','Arrival','Deadline','Machine','Start',
                       'Processing Time','End','Tardiness']
     """
-    df_arrivals_deadlines = df_arrivals_deadlines.sort_values(arrival_column).reset_index(drop=True)
+    df_arrivals_deadlines = df_arrivals_deadlines.sort_values(deadline_column, ascending=sort_ascending).reset_index(drop=True)
     arrival = df_arrivals_deadlines.set_index("Job")[arrival_column].to_dict()
     deadline = df_arrivals_deadlines.set_index("Job")[deadline_column].to_dict()
     job_list = df_arrivals_deadlines["Job"].tolist()

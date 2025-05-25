@@ -10,7 +10,7 @@ def solve_jssp_sum_tardiness(
     df_jssp: pd.DataFrame,
     df_arrivals_deadlines: pd.DataFrame,
     solver_time_limit: int = 1200,
-    epsilon: float = 0.0, msg_print=False, threads=None
+    epsilon: float = 0.0, msg_print=False, threads=None, sort_ascending=False
 ) -> pd.DataFrame:
     """
     Minimiert die Summe der Tardiness (Verspätungen) aller Jobs.
@@ -28,7 +28,7 @@ def solve_jssp_sum_tardiness(
     - total_tardiness: Summe aller Tardiness (float).
     """
     # Vorverarbeitung
-    df_arrivals_deadlines = df_arrivals_deadlines.sort_values("Arrival").reset_index(drop=True)
+    df_arrivals_deadlines = df_arrivals_deadlines.sort_values("Deadline", ascending=sort_ascending).reset_index(drop=True)
     arrival = df_arrivals_deadlines.set_index("Job")["Arrival"].to_dict()
     deadline = df_arrivals_deadlines.set_index("Job")["Deadline"].to_dict()
     jobs = df_arrivals_deadlines["Job"].tolist()
